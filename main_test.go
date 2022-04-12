@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/thoas/go-funk"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -35,25 +36,114 @@ func stubUsers(b *testing.B) (users []*User) {
 	return users
 }
 
+func stubUsers2(b *testing.B) (users []User) {
+	for i := 0; i < b.N; i++ {
+		user := User{
+			Name:     genRandomString(100),
+			Password: genRandomString(100),
+		}
+		users = append(users, user)
+	}
+
+	return users
+}
+
+func connect() (*gorm.DB, error) {
+	dsn := "host=localhost user=testuser password=123456 dbname=testdb port=5432 sslmode=disable TimeZone=Asia/Bangkok"
+	return gorm.Open(postgres.Open(dsn), &gorm.Config{})
+}
+
 func BenchmarkOrmCreate(b *testing.B) {
-	db, err := gorm.Open("postgres", "host=localhost port=5432 user=testuser dbname=testdb password=123456 sslmode=disable")
+	db, err := connect()
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer db.Close()
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
 
 	users := stubUsers(b)
+
 	for _, user := range users {
 		db.Create(user)
 	}
+
 }
 
-func BenchmarkCreate(b *testing.B) {
-	db, err := gorm.Open("postgres", "host=localhost port=5432 user=testuser dbname=testdb password=123456 sslmode=disable")
+func BenchmarkOrmCreateAll(b *testing.B) {
+	db, err := connect()
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer db.Close()
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
+	users := stubUsers2(b)
+	db.Create(&users)
+}
+
+func BenchmarkOrmCreateAllBatchSize100(b *testing.B) {
+	db, err := connect()
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
+	users := stubUsers2(b)
+	db.CreateInBatches(&users, 100)
+}
+
+func BenchmarkOrmCreateAllBatchSize500(b *testing.B) {
+	db, err := connect()
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
+	users := stubUsers2(b)
+	db.CreateInBatches(&users, 500)
+}
+
+func BenchmarkOrmCreateAllBatchSize1000(b *testing.B) {
+	db, err := connect()
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
+	users := stubUsers2(b)
+	db.CreateInBatches(&users, 1000)
+}
+
+func _BenchmarkCreate(b *testing.B) {
+	db, err := connect()
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
 
 	users := stubUsers(b)
 	tx := db.Begin()
@@ -78,11 +168,16 @@ func BenchmarkCreate(b *testing.B) {
 }
 
 func BenchmarkBulkCreate(b *testing.B) {
-	db, err := gorm.Open("postgres", "host=localhost port=5432 user=testuser dbname=testdb password=123456 sslmode=disable")
+	db, err := connect()
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer db.Close()
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
 
 	users := stubUsers(b)
 	size := 500
@@ -111,11 +206,16 @@ func BenchmarkBulkCreate(b *testing.B) {
 }
 
 func benchmarkBulkCreate(size int, b *testing.B) {
-	db, err := gorm.Open("postgres", "host=localhost port=5432 user=testuser dbname=testdb password=123456 sslmode=disable")
+	db, err := connect()
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer db.Close()
+	defer func() {
+		d, err := db.DB()
+		if err == nil {
+			d.Close()
+		}
+	}()
 
 	users := stubUsers(b)
 	tx := db.Begin()
